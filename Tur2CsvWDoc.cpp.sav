@@ -1,0 +1,360 @@
+// Tur2CsvWDoc.cpp : implementation of the CTur2CsvWDoc class
+//
+
+#include "stdafx.h"
+
+#include "CPar.h"
+#include "SEgyMinta.h"
+#include "CEdzes.h"
+#include "CCsvFile.h"
+#include "Tur2CsvW.h"
+#include "CSzovPar.h"
+#include "CBinPar.h"
+#include "CKonverter.h"
+
+#include "Tur2CsvWDoc.h"
+
+#include "CloseTaining.h"
+
+#include "CDiagram.h"
+#include "CEdzDiagram.h"
+#include "CMagKulDiagram.h"
+
+#include "Tur2CsvWView.h"
+#include "CMagassagKulView.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+// CTur2CsvWDoc
+
+IMPLEMENT_DYNCREATE(CTur2CsvWDoc, CDocument)
+
+BEGIN_MESSAGE_MAP(CTur2CsvWDoc, CDocument)
+	//{{AFX_MSG_MAP(CTur2CsvWDoc)
+	ON_COMMAND(ID_FILE_OPEN, OnFileOpen)
+  ON_COMMAND(ID_MOVEZOOM_LEFT, OnMoveZoomLeft)
+  ON_COMMAND(ID_MOVEZOOM_RIGHT, OnMoveZoomRight)
+  ON_COMMAND(ID_MOVEZOOM_SHRINK, OnMoveZoomShrink)
+  ON_COMMAND(ID_MOVEZOOM_STRETCH, OnMoveZoomStretch)
+  ON_COMMAND(ID_FILE_CLOSE, OnFileClose)
+
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+// static const int CTur2CsvWDoc::m_nMaxEdzSzam = 5 ;
+
+/////////////////////////////////////////////////////////////////////////////
+// CTur2CsvWDoc construction/destruction
+
+CTur2CsvWDoc::CTur2CsvWDoc() : m_fNyuzsFaktor( 1.1f), m_nEltLepes( 20) // [s]
+{
+	// TODO: add one-time construction code here
+  m_fNyuzsoritasX = 1.0f ;
+  m_nTolIdo = 0 ;
+  m_nIgIdo  = 0 ;
+}
+
+long CTur2CsvWDoc::GetTolIdo()
+{
+  return m_nTolIdo ;
+}
+
+long CTur2CsvWDoc::GetIgIdo()
+{
+  return m_nIgIdo ;
+}
+
+CEdzes* CTur2CsvWDoc::GetEdzes( int nIdx)
+{
+  if ( nIdx > nMaxEdzSzam )
+  {
+    return NULL ;
+  }
+
+  return m_aEdzesek + nIdx ;
+}
+
+CTur2CsvWDoc::~CTur2CsvWDoc()
+{
+}
+
+// pt++ : int AFXAPI AfxWinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance,LPTSTR lpCmdLine, int nCmdShow)
+// pt++ : BOOL CTur2CsvWApp::InitInstance() \|/
+// pt++ : BOOL CWinApp::ProcessShellCommand(CCommandLineInfo& rCmdInfo) \|/
+// pt++ : CWinApp::OnFileNew() \|/
+// pt++ : CDocManager::OnFileNew() \|/
+// pt++ : CSingleDocTemplate::OpenDocumentFile \|/
+BOOL CTur2CsvWDoc::OnNewDocument()
+{
+  // pt++ : ez csak torli a dokument tartalmat, es a file nevet
+	if (!CDocument::OnNewDocument())
+		return FALSE;
+
+	// TODO: add reinitialization code here
+	// (SDI documents will reuse this document)
+
+	return TRUE;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// CTur2CsvWDoc serialization
+
+void CTur2CsvWDoc::Serialize(CArchive& ar)
+{
+	if (ar.IsStoring())
+	{
+		// TODO: add storing code here
+	}
+	else
+	{
+		// TODO: add loading code here
+	}
+}
+
+void CTur2CsvWDoc::OnMoveZoomLeft()
+{
+  int nAktEdz = 0 ;
+
+TRACE( "CTur2CsvWDoc::OnMoveZoomLeft()\n") ;
+  for ( nAktEdz = 0 ; nAktEdz < CTur2CsvWDoc::nMaxEdzSzam ; nAktEdz++ )
+  {
+    if ( m_aEdzesek[nAktEdz].Kijelzendo() == TRUE )
+    {
+      // Ne engedje ki tulsagosan balra, hogy az ujra kepernyore kerulesig sokat
+      // kelljen gorgetni
+      if ( m_nTolIdo + m_nEltLepes < m_aEdzesek[nAktEdz].GetElteltIdo( m_aEdzesek[nAktEdz].GetMintakSzama()-1) )
+      {
+        m_nTolIdo = m_nTolIdo + m_nEltLepes ;
+        m_nIgIdo  = m_nIgIdo  + m_nEltLepes ;
+
+        UpdateAllViews( NULL) ;
+
+        return ;
+      }
+    }
+  }
+}
+
+void CTur2CsvWDoc::OnMoveZoomRight()
+{
+TRACE( "CTur2CsvWDoc::OnMoveZoomRight()\n") ;
+  if ( m_nTolIdo >= m_nEltLepes )
+  {
+    m_nTolIdo = m_nTolIdo - m_nEltLepes ;
+    m_nIgIdo  = m_nIgIdo  - m_nEltLepes ;
+
+    UpdateAllViews( NULL) ;
+  }
+}
+
+void CTur2CsvWDoc::OnMoveZoomShrink()
+{
+  m_fNyuzsoritasX = m_fNyuzsoritasX / m_fNyuzsFaktor ;
+TRACE( "CTur2CsvWDoc::OnMoveZoomShrink() m_fNyuzsoritasX=%f\n", m_fNyuzsoritasX) ;
+
+TRACE( "CTur2CsvWDoc::OnMoveZoomShrink() m_nIgIdo=%d elotte\n", m_nIgIdo) ;
+  m_nIgIdo = m_nTolIdo + (int)((m_nIgIdo - m_nTolIdo)*m_fNyuzsFaktor) ;
+TRACE( "CTur2CsvWDoc::OnMoveZoomShrink() m_nIgIdo=%d utana ------------------------ \n", m_nIgIdo) ;
+
+  UpdateAllViews( NULL) ;
+}
+
+void CTur2CsvWDoc::OnMoveZoomStretch()
+{
+  m_fNyuzsoritasX = m_fNyuzsoritasX * m_fNyuzsFaktor ;
+TRACE( "CTur2CsvWDoc::OnMoveZoomStretch() m_fNyuzsoritasX=%f\n", m_fNyuzsoritasX) ;
+
+TRACE( "CTur2CsvWDoc::OnMoveZoomStretch() m_nIgIdo=%d elotte\n", m_nIgIdo) ;
+  m_nIgIdo = m_nTolIdo + (int)((m_nIgIdo - m_nTolIdo)/m_fNyuzsFaktor) ;
+TRACE( "CTur2CsvWDoc::OnMoveZoomStretch() m_nIgIdo=%d utana ------------------------ \n", m_nIgIdo) ;
+
+  UpdateAllViews( NULL) ;
+}
+
+void CTur2CsvWDoc::OnFileClose()
+{
+  CCloseTaining cCloseTaining( this) ;
+
+TRACE( "CTur2CsvWDoc::OnFileClose()\n") ;
+  // CEdzes::SetKijelzendo( FALSE) ;
+  cCloseTaining.DoModal() ;
+
+  m_nIgIdo = 0 ;
+  for ()
+  {
+    m_nIgIdo = max( m_nIgIdo, m_aEdzesek[nIdx].ElteltIdo( 0, m_aEdzesek[nIdx].GetMintakSzama()-1)) ;
+  }
+
+//  UpdateAllViews( NULL) ;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// CTur2CsvWDoc diagnostics
+
+#ifdef _DEBUG
+void CTur2CsvWDoc::AssertValid() const
+{
+	CDocument::AssertValid();
+}
+
+void CTur2CsvWDoc::Dump(CDumpContext& dc) const
+{
+	CDocument::Dump(dc);
+}
+#endif //_DEBUG
+
+{
+  POSITION pos = NULL ;
+  // Ebben a programban elore mindnek foglal helyet
+  while ( nIdx < N_MAX_EDZ_SZAM && m_aEdzesek[nIdx].Kijelzendo() == TRUE )
+  {
+    nIdx++ ;
+  }
+
+  pos = GetFirstViewPosition() ;
+
+  while (pos != NULL)
+  {
+    CView* pView = GetNextView(pos);
+
+    if ( pView->IsKindOf( RUNTIME_CLASS( CTur2CsvWView)) == TRUE )
+    {
+      ((CTur2CsvWView*)pView)->TolIdoBeallit( 0) ;
+//        ((CTur2CsvWView*)pView)->IgIdoBeallit( m_aEdzesek) ;
+      ((CTur2CsvWView*)pView)->IgIdoBeallit( m_nIgIdo) ;
+    }
+    else
+    {
+      if ( pView->IsKindOf( RUNTIME_CLASS( CMagassagKulView)) == TRUE )
+      {
+        ((CMagassagKulView*)pView)->TolIdoBeallit( 0) ;
+//          ((CMagassagKulView*)pView)->IgIdoBeallit( m_aEdzesek) ;
+        ((CMagassagKulView*)pView)->IgIdoBeallit( m_nIgIdo) ;
+      }
+    }
+
+    pView->UpdateWindow() ;
+  }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// CTur2CsvWDoc commands
+
+void CTur2CsvWDoc::OnFileOpen() 
+{
+  POSITION  nPosition ;
+  CString   sMegnyFile ;
+  const int nFileNevBufferMer = 1024 ;
+  char      pszFileNevBuffer[nFileNevBufferMer] ;
+  int       nIdx = 0 ;
+
+  CFileDialog cOpenFileDialog( TRUE, "tur", NULL, OFN_ALLOWMULTISELECT, "TUR files (*.tur)|*.tur||") ;
+
+  pszFileNevBuffer[0] = '\0' ;
+  cOpenFileDialog.m_ofn.lpstrFile = pszFileNevBuffer  ;
+  cOpenFileDialog.m_ofn.nMaxFile  = nFileNevBufferMer ;
+
+  if ( cOpenFileDialog.DoModal() == IDOK )
+  {
+    nPosition = cOpenFileDialog.GetStartPosition() ;
+
+    while ( (POSITION)nPosition != NULL && nIdx < N_MAX_EDZ_SZAM )
+    {
+      // Call this function to retrieve the position of the first file path 
+      // name in the list, if m_ofn.Flags has the OFN_ALLOWMULTISELECT flag set.
+      sMegnyFile = cOpenFileDialog.GetNextPathName( nPosition) ;
+TRACE( "sMegnyFile:%s\n", (const char*)sMegnyFile) ;
+
+      // Ebben a programban elore mindnek foglal helyet
+      while ( nIdx < N_MAX_EDZ_SZAM && m_aEdzesek[nIdx].Kijelzendo() == TRUE )
+      {
+        nIdx++ ;
+      }
+
+      if ( nIdx < N_MAX_EDZ_SZAM )
+      {
+TRACE( "m_cKonverter.Konvertal()\n") ;
+        m_cKonverter.Konvertal( (char*)(const char*) sMegnyFile, m_aEdzesek+nIdx) ;
+        m_nIgIdo = max( m_nIgIdo, m_aEdzesek[nIdx].ElteltIdo( 0, m_aEdzesek[nIdx].GetMintakSzama()-1)) ;
+      }
+    }
+
+//    if ( nIdx < N_MAX_EDZ_SZAM )
+//    {
+//      m_nIgIdo = max( m_nIgIdo, m_aEdzesek[nIdx].ElteltIdo( 0, m_aEdzesek[nIdx].GetMintakSzama()-1)) ;
+//    }
+
+    POSITION pos = GetFirstViewPosition() ;
+
+    while (pos != NULL)
+    {
+      CView* pView = GetNextView(pos);
+
+      if ( pView->IsKindOf( RUNTIME_CLASS( CTur2CsvWView)) == TRUE )
+      {
+        ((CTur2CsvWView*)pView)->TolIdoBeallit( 0) ;
+//        ((CTur2CsvWView*)pView)->IgIdoBeallit( m_aEdzesek) ;
+        ((CTur2CsvWView*)pView)->IgIdoBeallit( m_nIgIdo) ;
+      }
+      else
+      {
+        if ( pView->IsKindOf( RUNTIME_CLASS( CMagassagKulView)) == TRUE )
+        {
+          ((CMagassagKulView*)pView)->TolIdoBeallit( 0) ;
+//          ((CMagassagKulView*)pView)->IgIdoBeallit( m_aEdzesek) ;
+          ((CMagassagKulView*)pView)->IgIdoBeallit( m_nIgIdo) ;
+        }
+      }
+
+      pView->UpdateWindow() ;
+    }
+
+//    if ( nIdx < N_MAX_EDZ_SZAM )
+//    {
+//      m_nIgIdo = max( m_nIgIdo, m_aEdzesek[nIdx].ElteltIdo( 0, m_aEdzesek[nIdx].GetMintakSzama()-1)) ;
+//    }
+
+   // A diagramok aktualizalasa
+//    SetModifiedFlag( TRUE) ; -> ennek hatasara Exit-nel rakerdez, hogy akarom-e menteni ;-)
+    UpdateAllViews( NULL) ;
+  }
+}
+
+/*
+  m_ofn structure is of type OPENFILENAME
+  typedef struct tagOFN { // ofn  
+    DWORD         lStructSize; 
+    HWND          hwndOwner; 
+    HINSTANCE     hInstance; 
+    LPCTSTR       lpstrFilter; 
+    LPTSTR        lpstrCustomFilter; 
+    DWORD         nMaxCustFilter; 
+    DWORD         nFilterIndex; 
+    LPTSTR        lpstrFile; 
+    DWORD         nMaxFile; 
+    LPTSTR        lpstrFileTitle; 
+    DWORD         nMaxFileTitle; 
+    LPCTSTR       lpstrInitialDir; 
+    LPCTSTR       lpstrTitle; 
+    DWORD         Flags; 
+    WORD          nFileOffset; 
+    WORD          nFileExtension; 
+    LPCTSTR       lpstrDefExt; 
+    DWORD         lCustData; 
+    LPOFNHOOKPROC lpfnHook; 
+    LPCTSTR       lpTemplateName; 
+} OPENFILENAME;
+
+OFN_ALLOWMULTISELECT -> m_ofn.lpstrFile with a pointer to a buffer you have allocated
+set m_ofn.nMaxFile with the number of characters in the buffer pointed to by m_ofn.lpstrFile
+|-> FindFirstFile()
+The GetOpenFileName and GetSaveFileName functions return FALSE if the buffer is too small to contain the file information. The buffer should be at least 256 characters long. 
+
+pszDefExt   The default filename extension. If the user does not include an extension in the Filename edit box, the extension specified by lpszDefExt is automatically appended to the filename.
+*/
